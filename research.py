@@ -43,7 +43,6 @@ def main():
     url = construct_url(args.query, args.searchIN, args.from_date, args.to_date, args.apiKey)
     print(url)
     response = run_curl(url)
-#    print(response)
 
     try:
         all_articles = json.loads(response)
@@ -56,27 +55,35 @@ def main():
         articles_data.append({
             'title': article['title'],
             'description': article['description'],
-            'content': article['content']
+            'content': article['content'],
+            'url': article['url']
         })
 
-    chat = ChatOpenAI(temperature=0)
+    # Initialize with API key from environment variable or use your key directly
+    import os
+    openai_api_key = os.environ.get("OPENAI_API_KEY")
+    chat = ChatOpenAI(temperature=0, api_key=openai_api_key)
+    chat2 = ChatOpenAI(model="gpt-4", temperature=0, api_key=openai_api_key)
 
-    summaries = []
     for article in articles_data:
+        article_url = article['url']
         messages = [
             SystemMessage(content="Summarize the content of this article in two sentences."),
             HumanMessage(content=str(article)),
         ]
-        result = chat(messages)
-        print(result.content)
-        print("\n\n")
-        summaries.append(result.content)
+        result = chat.invoke(messages)
+        article.clear()
+        article['url'] = article_url
+        article['summary'] = result.content
+
+
+    print(articles_data)
 
     messages2 = [
-        SystemMessage(content="Write an executive summary of max one page."),
-        HumanMessage(content=str(summaries)),
+        SystemMessage(content="Write a comprehensive overview of the news mentioned in these summaries but do not include duplicate information. Use the mutually exclusive, collectively exhaustive approach. Cite the sources for the topics you identify by providing the URLs mentioned in the summaries in your text as inline references."),
+        HumanMessage(content=str(articles_data)),
     ]
-    result2 = chat(messages2)
+    result2 = chat2.invoke(messages2)
     print(result2.content)
 
 if __name__ == '__main__':
